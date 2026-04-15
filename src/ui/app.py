@@ -8,6 +8,7 @@ import time
 import webbrowser
 
 from logic.batch import run_batch
+from logic.cheats import max_kings, max_quantity, max_skill
 
 EDITOR_DIR = r"C:\Editor"
 SAMPLE_BAT = os.path.join(EDITOR_DIR, "sample.bat")
@@ -35,6 +36,7 @@ class SaveEditorApp(tk.Tk):
 
         self.create_widgets()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.current_tree = None
 
     def create_widgets(self):
         top = tk.Frame(self)
@@ -44,6 +46,8 @@ class SaveEditorApp(tk.Tk):
         tk.Button(top, text="Save Changes", command=self.save_changes).pack(side=tk.LEFT, padx=5)
         tk.Button(top, text="Browse JSON", command=self.choose_file).pack(side=tk.LEFT, padx=5)
         tk.Button(top, text="About", command=self.show_about).pack(side=tk.LEFT, padx=5)
+        tk.Button(top, text="Full Kings", command=self.max_kings).pack(side=tk.LEFT, padx=5)
+        tk.Button(top, text="Max Amount", command=self.max_amount).pack(side=tk.LEFT, padx=5)
 
         self.status = tk.Label(top, text="")
         self.status.pack(side=tk.RIGHT, padx=10)
@@ -165,12 +169,11 @@ class SaveEditorApp(tk.Tk):
         self.create_stats(self.tab_stats, player)
 
     def create_stats(self, parent, player):
-        for key in ["health", "fury", "cash"]:
+        for key in ["health", "fury"]:
             frame = tk.Frame(parent)
             frame.pack(pady=5)
 
             tk.Label(frame, text=key, width=10).pack(side=tk.LEFT)
-            tk.Button(frame, text="Max", command=lambda: var.set("99999999")).pack(side=tk.LEFT)
 
             if key == "cash":
                 value = player.get("inventory", {}).get("cash", 0)
@@ -184,6 +187,8 @@ class SaveEditorApp(tk.Tk):
             def save_value(e=None, k=key, v=var):
                 try:
                     if k == "cash":
+                        if "inventory" not in player:
+                            player["inventory"] = {}
                         player["inventory"]["cash"] = int(v.get())
                     else:
                         player[k] = float(v.get())
@@ -192,6 +197,31 @@ class SaveEditorApp(tk.Tk):
 
             entry.bind("<Return>", save_value)
             entry.bind("<FocusOut>", save_value)
+
+            tk.Button(frame, text="Max", command=lambda v=var: v.set("99999999")).pack(side=tk.LEFT)
+            frame = tk.Frame(parent)
+            frame.pack(pady=10)
+
+            tk.Label(frame, text="Money", width=10).pack(side=tk.LEFT)
+
+            value = player.get("inventory", {}).get("cash", 0)
+
+            var = tk.StringVar(value=str(value))
+            entry = tk.Entry(frame, textvariable=var)
+            entry.pack(side=tk.LEFT)
+
+            def save_cash(e=None, v=var):
+                try:
+                    if "inventory" not in player:
+                        player["inventory"] = {}
+                    player["inventory"]["cash"] = int(v.get())
+                except:
+                    pass
+
+            entry.bind("<Return>", save_cash)
+            entry.bind("<FocusOut>", save_cash)
+
+            tk.Button(frame, text="Max", command=lambda: var.set("99999999")).pack(side=tk.LEFT)
 
     def create_table(self, parent, columns, data, map_ref):
         tree = ttk.Treeview(parent, columns=columns, show="headings")
@@ -216,6 +246,7 @@ class SaveEditorApp(tk.Tk):
                 menu.post(event.x_root, event.y_root)
 
         tree.bind("<Button-3>", show_menu)
+        tree.bind("<Button-1>", lambda e: setattr(self, "current_tree", tree))
 
         for index, item in enumerate(data):
             values = []
@@ -335,7 +366,7 @@ class SaveEditorApp(tk.Tk):
         win.title("About")
         win.geometry("400x200")
 
-        tk.Label(win, text="Dying Light Json Editor UI by Kayo", font=("Arial", 14)).pack(pady=10)
+        tk.Label(win, text="Dying Light Json Editor UI by paradox32000", font=("Arial", 14)).pack(pady=10)
 
         tk.Label(
             win,
@@ -377,5 +408,73 @@ class SaveEditorApp(tk.Tk):
 
                 data.append(new_item)
                 break
+
+        self.populate()
+        
+    def max_kings(self):
+        if not self.current_data:
+            return
+
+        tree = self.current_tree
+        if not tree:
+            return
+
+        selected = tree.selection()
+        if not selected:
+            return
+
+        row_id = selected[0]
+        index, parent_list = self.global_map[(tree, row_id)]
+        item = parent_list[index]
+
+        max_kings(item)
+
+        self.populate()
+        
+    def max_amount(self):
+        if not self.current_data:
+            return
+
+        tree = self.current_tree
+        if not tree:
+            return
+
+        selected = tree.selection()
+
+        if selected:
+            row_id = selected[0]
+            index, parent_list = self.global_map[(tree, row_id)]
+            item = parent_list[index]
+
+            if "quantity" in item:
+                max_quantity(item)
+
+            elif "stacks" in item:
+                max_skill(item)
+
+            elif "unknown" in item and "unknown001" in item["unknown"]:
+                item["unknown"]["unknown001"] = 9999
+
+        else:
+            player = self.current_data.get("player", {})
+            inv = player.get("inventory", {})
+
+            for obj in inv.get("equipmentSlots", []):
+                if "quantity" in obj:
+                    obj["quantity"] = 999999999
+
+            for obj in inv.get("items3", []):
+                if "quantity" in obj:
+                    obj["quantity"] = 999999999
+
+            for skill in player.get("skills", []):
+                if "stacks" in skill:
+                    skill["stacks"] = 9999
+
+            for buff in player.get("buffs", []):
+                if "stacks" in buff:
+                    buff["stacks"] = 9999
+                elif "unknown" in buff and "unknown001" in buff["unknown"]:
+                    buff["unknown"]["unknown001"] = 9999
 
         self.populate()
