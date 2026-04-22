@@ -1,5 +1,5 @@
-# Dying-Light-Json-Editor-UI
-This project is a tool designed to be a UI for the CLI save editor by Steffen. Can be found [here](https://steffenl.com/projects/dying-light-save-editor/releases).
+# Dying Light Save Editor GUI
+This project is a tool designed to be a GUI for the Dying Light CLI save editor by Steffen. Can be found [here](https://steffenl.com/projects/dying-light-save-editor/releases).
 
 It allows users to edit player stats, skills, and other in-game values in a simple interface. (basically its a json editor).
 
@@ -17,4 +17,6 @@ editor.exe and your save file save_coop_0.sav must be at C:\Editor
 
 ## Requirements
 
-Python
+* Python
+
+* [CLI by Steffen](https://steffenl.com/projects/dying-light-save-editor/releases).
