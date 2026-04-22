@@ -9,6 +9,7 @@ import webbrowser
 
 from logic.batch import run_batch
 from logic.cheats import max_kings, max_quantity, max_skill
+from logic.plugin_loader import load_plugins
 
 EDITOR_DIR = r"C:\Editor"
 SAMPLE_BAT = os.path.join(EDITOR_DIR, "sample.bat")
@@ -23,7 +24,7 @@ TEMP_SAVE = os.path.join(EDITOR_DIR, "._tmp.sav")
 class SaveEditorApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Dying Light Json Editor UI")
+        self.title("Dying Light Save Editor GUI")
         self.geometry("1000x700")
 
         self.json_path = DEFAULT_JSON
@@ -33,11 +34,14 @@ class SaveEditorApp(tk.Tk):
         self.skill_map = {}
         self.clipboard_data = None
         self.global_map = {}
+        self.plugins = load_plugins()
 
         self.create_widgets()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.current_tree = None
-
+        for plugin in self.plugins:
+            if plugin["init_ui"]:
+                plugin["init_ui"](self)
     def create_widgets(self):
         top = tk.Frame(self)
         top.pack(fill=tk.X, pady=5)
@@ -64,6 +68,15 @@ class SaveEditorApp(tk.Tk):
         self.notebook.add(self.tab_inventory, text="Inventory")
         self.notebook.add(self.tab_skills, text="Skills")
         self.notebook.add(self.tab_stats, text="Stats")
+        plugin_frame = tk.LabelFrame(self, text="Plugins")
+        plugin_frame.pack(fill=tk.X, pady=5)
+
+        for plugin in self.plugins:
+            tk.Button(
+                plugin_frame,
+                text=plugin["name"],
+                command=lambda p=plugin: self.run_plugin(p)
+            ).pack(side=tk.LEFT, padx=5)
 
     def choose_file(self):
         path = filedialog.askopenfilename(filetypes=[("JSON files", "*.json")])
@@ -142,13 +155,47 @@ class SaveEditorApp(tk.Tk):
 
         player = self.current_data.get("player", {})
 
-        weapons = player.get("inventory", {}).get("equipmentSlots", [])
+        inventory = player.get("inventory", {})
+
+        all_items = (
+            inventory.get("items1", []) +
+            inventory.get("quickSlots", []) +
+            inventory.get("equipmentSlots", [])
+        )
+
+        weapons = [
+            item for item in all_items
+            if isinstance(item, dict)
+        ]
         items = player.get("inventory", {}).get("items3", [])
         skills = player.get("buffs", []) + player.get("skills", [])
 
         self.weapon_map.clear()
         self.inventory_map.clear()
         self.skill_map.clear()
+        btn_frame = tk.Frame(self.tab_skills)
+        btn_frame.pack(fill=tk.X, pady=5)
+
+        tk.Button(
+            btn_frame,
+            text="Add All Legend Skills",
+            command=self.add_legend_skills
+        ).pack(side=tk.LEFT, padx=5)
+
+        tk.Button(
+            btn_frame,
+            text="Delete Selected",
+            command=self.delete_selected_skills
+        ).pack(side=tk.LEFT, padx=5)
+
+        btn_frame = tk.Frame(self.tab_weapons)
+        btn_frame.pack(fill=tk.X, pady=5)
+
+        tk.Button(
+            btn_frame,
+            text="Max Condition + Reset Repairs",
+            command=self.max_weapon_stats
+        ).pack(side=tk.LEFT, padx=5)
 
         self.create_table(
             self.tab_weapons,
@@ -265,7 +312,7 @@ class SaveEditorApp(tk.Tk):
                         values.append(item.get(col, ""))
             row_id = tree.insert("", tk.END, values=values)
             map_ref[row_id] = (tree, index, data)
-            self.global_map[(tree, row_id)] = (index, data)
+            self.global_map[(tree, row_id)] = (index, data, item)
 
         tree.bind("<Double-1>", lambda e: self.edit_cell(e, tree, columns))
 
@@ -288,8 +335,7 @@ class SaveEditorApp(tk.Tk):
 
         def save_edit(e=None):
             new_value = entry.get()
-            index, parent_list = self.global_map[(tree, row_id)]
-            item = parent_list[index]
+            index, parent_list, item = self.global_map[(tree, row_id)]
 
             try:
                 if key == "name":
@@ -366,7 +412,7 @@ class SaveEditorApp(tk.Tk):
         win.title("About")
         win.geometry("400x200")
 
-        tk.Label(win, text="Dying Light Json Editor UI by paradox32000", font=("Arial", 14)).pack(pady=10)
+        tk.Label(win, text="Dying Light Save Editor GUI By paradox32000", font=("Arial", 14)).pack(pady=10)
 
         tk.Label(
             win,
@@ -424,8 +470,7 @@ class SaveEditorApp(tk.Tk):
             return
 
         row_id = selected[0]
-        index, parent_list = self.global_map[(tree, row_id)]
-        item = parent_list[index]
+        index, parent_list, item = self.global_map[(tree, row_id)]
 
         max_kings(item)
 
@@ -443,8 +488,7 @@ class SaveEditorApp(tk.Tk):
 
         if selected:
             row_id = selected[0]
-            index, parent_list = self.global_map[(tree, row_id)]
-            item = parent_list[index]
+            index, parent_list, item = self.global_map[(tree, row_id)]
 
             if "quantity" in item:
                 max_quantity(item)
@@ -476,5 +520,124 @@ class SaveEditorApp(tk.Tk):
                     buff["stacks"] = 9999
                 elif "unknown" in buff and "unknown001" in buff["unknown"]:
                     buff["unknown"]["unknown001"] = 9999
+
+        self.populate()
+        
+    def run_plugin(self, plugin):
+        tree = self.current_tree
+        if not tree:
+            return
+
+        selected = tree.selection()
+        if not selected:
+            return
+
+        items = []
+        for row_id in selected:
+            index, parent_list, item = self.global_map[(tree, row_id)]
+            items.append(item)
+
+        if plugin["run"]:
+            plugin["run"](self, items)
+
+        self.populate()
+        
+    def add_legend_skills(self):
+        if not self.current_data:
+            return
+
+        player = self.current_data.get("player", {})
+        buffs = player.get("buffs", [])
+
+        legend_skills = [
+            "LegendSkill_UnarmedDamage",
+            "LegendSkill_OneHandedDamage",
+            "LegendSkill_TwoHandedDamage",
+            "LegendSkill_FirearmsDamage",
+            "LegendSkill_BowDamage",
+            "LegendSkill_ThrowingDamage",
+            "LegendSkill_MaxStamina",
+            "LegendSkill_MaxHealth",
+            "LegendSkill_HealthRegeneration",
+            "LegendSkill_HealingEfficiency"
+        ]
+
+        existing = {b.get("name") for b in buffs}
+
+        for skill in legend_skills:
+            skill_name = skill + "_skill"
+
+            if skill_name not in existing:
+                buffs.append({
+                    "name": skill_name,
+                    "stacks": 25
+                })
+
+        player["buffs"] = buffs
+        self.populate()
+        
+    def delete_selected_skills(self):
+        tree = self.current_tree
+        if not tree:
+            return
+
+        selected = tree.selection()
+        if not selected:
+            return
+
+        player = self.current_data.get("player", {})
+
+        for row_id in reversed(selected):
+            if (tree, row_id) not in self.global_map:
+                continue
+
+            index, data, item = self.global_map[(tree, row_id)]
+
+            if item in player.get("buffs", []):
+                player["buffs"].remove(item)
+
+            elif item in player.get("skills", []):
+                player["skills"].remove(item)
+
+        self.populate()
+        
+    def max_weapon_stats(self):
+        if not self.current_data:
+            return
+
+        tree = self.current_tree
+        if not tree:
+            return
+
+        selected = tree.selection()
+
+        if selected:
+            for row_id in selected:
+                if (tree, row_id) not in self.global_map:
+                    continue
+
+                index, parent_list, item = self.global_map[(tree, row_id)]
+
+                if "condition" in item:
+                    item["condition"] = 999999
+
+                if "repairs" in item:
+                    item["repairs"] = 0
+
+        else:
+            player = self.current_data.get("player", {})
+            inventory = player.get("inventory", {})
+
+            for item in inventory.get("equipmentSlots", []):
+                if "condition" in item:
+                    item["condition"] = 999999
+                if "repairs" in item:
+                    item["repairs"] = 0
+
+            for item in inventory.get("items3", []):
+                if "condition" in item:
+                    item["condition"] = 999999
+                if "repairs" in item:
+                    item["repairs"] = 0
 
         self.populate()
