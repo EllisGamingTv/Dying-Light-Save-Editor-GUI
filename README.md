@@ -11,6 +11,10 @@ The goal of this project is to provide a reliable and easy-to-use editor for cus
 * Edit inventory
 * Edit skills
 
+## Releases
+
+[Downloads](https://github.com/EllisGamingTv/Dying-Light-Save-Editor-GUI/releases)
+
 ## How to Use
 
 editor.exe and your save file save_coop_0.sav must be at C:\Editor
