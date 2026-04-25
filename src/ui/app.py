@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, messagebox
 import json
 import os
 import subprocess
@@ -8,7 +8,7 @@ import time
 import webbrowser
 
 from logic.batch import run_batch
-from logic.cheats import max_kings, max_quantity, max_skill
+from logic.cheats import max_kings, max_quantity, max_skill, set_rarity, set_platinum, SOCKET_UPGRADES, get_duplicate_id_map
 from logic.plugin_loader import load_plugins
 
 EDITOR_DIR = r"C:\Editor"
@@ -24,7 +24,7 @@ TEMP_SAVE = os.path.join(EDITOR_DIR, "._tmp.sav")
 class SaveEditorApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Dying Light Save Editor GUI")
+        self.title("Dying Light Save Editor GUI 1.3")
         self.geometry("1000x700")
 
         self.json_path = DEFAULT_JSON
@@ -35,6 +35,7 @@ class SaveEditorApp(tk.Tk):
         self.clipboard_data = None
         self.global_map = {}
         self.plugins = load_plugins()
+        self.socket_options = SOCKET_UPGRADES
 
         self.create_widgets()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -48,10 +49,33 @@ class SaveEditorApp(tk.Tk):
 
         tk.Button(top, text="Open Save", command=self.load_save).pack(side=tk.LEFT, padx=5)
         tk.Button(top, text="Save Changes", command=self.save_changes).pack(side=tk.LEFT, padx=5)
-        tk.Button(top, text="Browse JSON", command=self.choose_file).pack(side=tk.LEFT, padx=5)
+        tk.Button(top, text="Check IDs", command=self.check_ids).pack(side=tk.LEFT, padx=5)
         tk.Button(top, text="About", command=self.show_about).pack(side=tk.LEFT, padx=5)
         tk.Button(top, text="Full Kings", command=self.max_kings).pack(side=tk.LEFT, padx=5)
         tk.Button(top, text="Max Amount", command=self.max_amount).pack(side=tk.LEFT, padx=5)
+        tk.Button(top, text="Edit Sockets", command=self.edit_sockets_window).pack(side=tk.LEFT, padx=5)
+        self.rarity_var = tk.StringVar(value="white")
+
+        rarity_menu = ttk.Combobox(
+            top,
+            textvariable=self.rarity_var,
+            values=["white", "green", "blue", "violet", "orange", "platinum"],
+            state="readonly",
+            width=10
+        )
+        rarity_menu.pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(
+            top,
+            text="Apply Rarity",
+            command=self.apply_rarity
+        ).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(
+            top,
+            text="All Platinum",
+            command=self.set_all_platinum
+        ).pack(side=tk.LEFT, padx=5)
 
         self.status = tk.Label(top, text="")
         self.status.pack(side=tk.RIGHT, padx=10)
@@ -412,7 +436,8 @@ class SaveEditorApp(tk.Tk):
         win.title("About")
         win.geometry("400x200")
 
-        tk.Label(win, text="Dying Light Save Editor GUI By paradox32000", font=("Arial", 14)).pack(pady=10)
+        tk.Label(win, text="Dying Light Save Editor GUI 1.3", font=("Arial", 14)).pack(pady=10)
+        tk.Label(win, text="By paradox32000", font=("Arial", 14)).pack(pady=10)
 
         tk.Label(
             win,
@@ -641,3 +666,119 @@ class SaveEditorApp(tk.Tk):
                     item["repairs"] = 0
 
         self.populate()
+        
+    def apply_rarity(self):
+        tree = self.current_tree
+        if not tree:
+            return
+
+        selected = tree.selection()
+        if not selected:
+            return
+
+        rarity = self.rarity_var.get()
+
+        for row_id in selected:
+            if (tree, row_id) not in self.global_map:
+                continue
+
+            _, _, item = self.global_map[(tree, row_id)]
+            set_rarity(item, rarity)
+
+        self.populate()
+        
+    def set_all_platinum(self):
+        if not self.current_data:
+            return
+
+        player = self.current_data.get("player", {})
+        inventory = player.get("inventory", {})
+
+        all_items = (
+            inventory.get("items1", []) +
+            inventory.get("quickSlots", []) +
+            inventory.get("equipmentSlots", [])
+        )
+
+        for item in all_items:
+            set_platinum(item)
+
+        self.populate()
+        
+    def edit_sockets_window(self):
+        tree = self.current_tree
+        if not tree:
+            return
+
+        selected = tree.selection()
+        if not selected:
+            return
+
+        row_id = selected[0]
+        _, _, item = self.global_map[(tree, row_id)]
+
+        if "upgradeSockets" not in item:
+            item["upgradeSockets"] = []
+
+        win = tk.Toplevel(self)
+        win.title("Edit Sockets")
+        win.geometry("400x500")
+
+        socket_vars = []
+
+        frame = tk.Frame(win)
+        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        def add_socket(value=""):
+            if len(socket_vars) >= 10:
+                return
+
+            var = tk.StringVar(value=value if value else self.socket_options[0])
+
+            combo = ttk.Combobox(
+                frame,
+                textvariable=var,
+                values=self.socket_options,
+                state="readonly",
+                width=35
+            )
+            combo.pack(pady=3)
+
+            socket_vars.append(var)
+
+        for socket in item["upgradeSockets"]:
+            add_socket(socket)
+
+        def save_sockets():
+            item["upgradeSockets"] = [var.get() for var in socket_vars if var.get()]
+            win.destroy()
+            self.populate()
+
+        tk.Button(win, text="Add Socket", command=add_socket).pack(pady=5)
+        tk.Button(win, text="Save", command=save_sockets).pack(pady=5)
+        
+    def check_ids(self):
+        all_items = []
+
+        player = self.current_data.get("player", {})
+        inventory = player.get("inventory", {})
+
+        all_items = (
+            inventory.get("items1", []) +
+            inventory.get("quickSlots", []) +
+            inventory.get("equipmentSlots", []) +
+            inventory.get("items3", [])
+        )
+
+        from logic.cheats import get_duplicate_id_map
+        duplicates = get_duplicate_id_map(all_items)
+
+        if not duplicates:
+            messagebox.showinfo("Check IDs", "No duplicate IDs found")
+            return
+
+        msg = ""
+        for item_id, items in duplicates.items():
+            msg += f"ID {item_id} → {len(items)} items\n"
+
+        messagebox.showwarning("Duplicate IDs Found", msg)
