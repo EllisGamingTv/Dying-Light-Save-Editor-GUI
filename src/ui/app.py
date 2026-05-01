@@ -6,9 +6,10 @@ import subprocess
 import shutil
 import time
 import webbrowser
+import copy
 
 from logic.batch import run_batch
-from logic.cheats import max_kings, max_quantity, max_skill, set_rarity, set_platinum, SOCKET_UPGRADES, get_duplicate_id_map
+from logic.cheats import max_kings, max_quantity, max_skill, set_rarity, set_platinum, SOCKET_UPGRADES, get_duplicate_id_map, LEGEND_SKILLS, ORANGE_CRAFTPLANS, WEAPON_NAMES
 from logic.plugin_loader import load_plugins
 
 EDITOR_DIR = r"C:\Editor"
@@ -24,8 +25,8 @@ TEMP_SAVE = os.path.join(EDITOR_DIR, "._tmp.sav")
 class SaveEditorApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Dying Light Save Editor GUI 1.3")
-        self.geometry("1000x700")
+        self.title("Dying Light Save Editor GUI 1.4")
+        self.geometry("1020x700")
 
         self.json_path = DEFAULT_JSON
         self.current_data = None
@@ -71,10 +72,38 @@ class SaveEditorApp(tk.Tk):
             command=self.apply_rarity
         ).pack(side=tk.LEFT, padx=5)
         
+        self.craftplan_var = tk.StringVar(value=ORANGE_CRAFTPLANS[0])
+
+        craftplan_menu = ttk.Combobox(
+            top,
+            textvariable=self.craftplan_var,
+            values=ORANGE_CRAFTPLANS,
+            state="readonly",
+            width=25
+        )
+        craftplan_menu.pack(side=tk.LEFT, padx=5)
+
         tk.Button(
             top,
-            text="All Platinum",
-            command=self.set_all_platinum
+            text="Apply Craftplan",
+            command=self.apply_craftplan
+        ).pack(side=tk.LEFT, padx=5)
+        
+        self.weapon_name_var = tk.StringVar(value=WEAPON_NAMES[0])
+
+        weapon_menu = ttk.Combobox(
+            top,
+            textvariable=self.weapon_name_var,
+            values=WEAPON_NAMES,
+            state="readonly",
+            width=25
+        )
+        weapon_menu.pack(side=tk.LEFT, padx=5)
+
+        tk.Button(
+            top,
+            text="Apply Weapon Name",
+            command=self.apply_weapon_name
         ).pack(side=tk.LEFT, padx=5)
 
         self.status = tk.Label(top, text="")
@@ -87,11 +116,13 @@ class SaveEditorApp(tk.Tk):
         self.tab_inventory = ttk.Frame(self.notebook)
         self.tab_skills = ttk.Frame(self.notebook)
         self.tab_stats = ttk.Frame(self.notebook)
+        self.tab_stash = ttk.Frame(self.notebook)
 
         self.notebook.add(self.tab_weapons, text="Weapons")
         self.notebook.add(self.tab_inventory, text="Inventory")
         self.notebook.add(self.tab_skills, text="Skills")
         self.notebook.add(self.tab_stats, text="Stats")
+        self.notebook.add(self.tab_stash, text="Stash")
         plugin_frame = tk.LabelFrame(self, text="Plugins")
         plugin_frame.pack(fill=tk.X, pady=5)
 
@@ -170,16 +201,16 @@ class SaveEditorApp(tk.Tk):
         self.set_status("")
 
     def populate(self):
-        for tab in (self.tab_weapons, self.tab_inventory, self.tab_skills, self.tab_stats):
+        for tab in (self.tab_weapons, self.tab_inventory, self.tab_skills, self.tab_stats, self.tab_stash):
             for widget in tab.winfo_children():
                 widget.destroy()
 
 
         player = self.current_data.get("player", {})
-
-        player = self.current_data.get("player", {})
-
+        
         inventory = player.get("inventory", {})
+        
+        storage = player.get("storage", {})
 
         all_items = (
             inventory.get("items1", []) +
@@ -192,7 +223,30 @@ class SaveEditorApp(tk.Tk):
             if isinstance(item, dict)
         ]
         items = player.get("inventory", {}).get("items3", [])
+        stash_items = (
+            storage.get("items1", []) +
+            storage.get("items3", [])
+        )
         skills = player.get("buffs", []) + player.get("skills", [])
+        
+        weapon_dropdown_frame = tk.Frame(self.tab_weapons)
+        weapon_dropdown_frame.pack(fill=tk.X, pady=5)
+
+        self.weapon_name_var = tk.StringVar(value=WEAPON_NAMES[0])
+
+        ttk.Combobox(
+            weapon_dropdown_frame,
+            textvariable=self.weapon_name_var,
+            values=WEAPON_NAMES,
+            state="readonly",
+            width=25
+        ).pack(side=tk.LEFT, padx=5)
+
+        tk.Button(
+            weapon_dropdown_frame,
+            text="Apply Weapon Name",
+            command=self.apply_weapon_name
+        ).pack(side=tk.LEFT, padx=5)
 
         self.weapon_map.clear()
         self.inventory_map.clear()
@@ -213,12 +267,29 @@ class SaveEditorApp(tk.Tk):
         ).pack(side=tk.LEFT, padx=5)
 
         btn_frame = tk.Frame(self.tab_weapons)
+        tk.Button(
+            btn_frame,
+            text="Powerful Weapon",
+            command=self.set_unknown008
+        ).pack(side=tk.LEFT, padx=5)
         btn_frame.pack(fill=tk.X, pady=5)
 
         tk.Button(
             btn_frame,
             text="Max Condition + Reset Repairs",
             command=self.max_weapon_stats
+        ).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(
+            btn_frame,
+            text="All Platinum",
+            command=self.set_all_platinum
+        ).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(
+            btn_frame,
+            text="OP Craft Combo",
+            command=self.set_op_craft_combo
         ).pack(side=tk.LEFT, padx=5)
 
         self.create_table(
@@ -227,6 +298,21 @@ class SaveEditorApp(tk.Tk):
             weapons,
         self.weapon_map
         )
+        
+        btn_frame_inv = tk.Frame(self.tab_inventory)
+        btn_frame_inv.pack(fill=tk.X, pady=5)
+        
+        tk.Button(
+            btn_frame_inv,
+            text="All Platinum",
+            command=self.set_all_platinum
+        ).pack(side=tk.LEFT, padx=5)
+
+        tk.Button(
+            btn_frame_inv,
+            text="Powerful Weapon",
+            command=self.set_unknown008
+        ).pack(side=tk.LEFT, padx=5)
 
         self.create_table(
             self.tab_inventory,
@@ -234,10 +320,45 @@ class SaveEditorApp(tk.Tk):
             items,
             self.inventory_map
         )
+        
+        self.create_table(
+            self.tab_inventory,
+            ["name","quantity","id","craftPlan","upgradeSockets"],
+            stash_items,
+            self.inventory_map
+        )
 
         self.create_table(self.tab_skills, ["name","stacks"], skills, self.skill_map)
 
         self.create_stats(self.tab_stats, player)
+        
+        btn_frame_stash = tk.Frame(self.tab_stash)
+        btn_frame_stash.pack(fill=tk.X, pady=5)
+        
+        tk.Button(
+            btn_frame_stash,
+            text="All Platinum",
+            command=self.set_all_platinum
+        ).pack(side=tk.LEFT, padx=5)
+
+        tk.Button(
+            btn_frame_stash,
+            text="Powerful Weapon",
+            command=self.set_unknown008
+        ).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(
+            btn_frame_stash,
+            text="OP Craft Combo",
+            command=self.set_op_craft_combo
+        ).pack(side=tk.LEFT, padx=5)
+        
+        self.create_table(
+            self.tab_stash,
+            ["name","quantity","id","craftPlan","upgradeSockets"],
+            stash_items,
+            self.inventory_map
+        )
 
     def create_stats(self, parent, player):
         for key in ["health", "fury"]:
@@ -295,7 +416,7 @@ class SaveEditorApp(tk.Tk):
             tk.Button(frame, text="Max", command=lambda: var.set("99999999")).pack(side=tk.LEFT)
 
     def create_table(self, parent, columns, data, map_ref):
-        tree = ttk.Treeview(parent, columns=columns, show="headings")
+        tree = ttk.Treeview(parent, columns=columns, show="headings", selectmode="extended")
         self.tree = tree
         tree = self.tree
 
@@ -339,6 +460,13 @@ class SaveEditorApp(tk.Tk):
             self.global_map[(tree, row_id)] = (index, data, item)
 
         tree.bind("<Double-1>", lambda e: self.edit_cell(e, tree, columns))
+        
+        def on_drag_select(event):
+            row = tree.identify_row(event.y)
+            if row:
+                tree.selection_add(row)
+
+        tree.bind("<B1-Motion>", on_drag_select)
 
     def edit_cell(self, event, tree, columns):
         row_id = tree.identify_row(event.y)
@@ -436,8 +564,8 @@ class SaveEditorApp(tk.Tk):
         win.title("About")
         win.geometry("400x200")
 
-        tk.Label(win, text="Dying Light Save Editor GUI 1.3", font=("Arial", 14)).pack(pady=10)
-        tk.Label(win, text="By paradox32000", font=("Arial", 14)).pack(pady=10)
+        tk.Label(win, text="Dying Light Save Editor GUI 1.4", font=("Arial", 14)).pack(pady=10)
+        tk.Label(win, text="By EllisGamingTv", font=("Arial", 14)).pack(pady=10)
 
         tk.Label(
             win,
@@ -469,16 +597,18 @@ class SaveEditorApp(tk.Tk):
         if not selected:
             return
 
-        row_id = selected[0]
+        for row_id in selected:
+            if (tree, row_id) not in self.global_map:
+                continue
 
-        for map_ref in [self.weapon_map, self.inventory_map, self.skill_map]:
-            if row_id in map_ref:
-                _, index, data = map_ref[row_id]
+            index, data, item = self.global_map[(tree, row_id)]
 
-                new_item = data[index].copy()
+            new_item = copy.deepcopy(item)
 
-                data.append(new_item)
-                break
+            if "id" in new_item:
+                new_item["id"] += 1000000
+
+            data.append(new_item)
 
         self.populate()
         
@@ -574,18 +704,7 @@ class SaveEditorApp(tk.Tk):
         player = self.current_data.get("player", {})
         buffs = player.get("buffs", [])
 
-        legend_skills = [
-            "LegendSkill_UnarmedDamage",
-            "LegendSkill_OneHandedDamage",
-            "LegendSkill_TwoHandedDamage",
-            "LegendSkill_FirearmsDamage",
-            "LegendSkill_BowDamage",
-            "LegendSkill_ThrowingDamage",
-            "LegendSkill_MaxStamina",
-            "LegendSkill_MaxHealth",
-            "LegendSkill_HealthRegeneration",
-            "LegendSkill_HealingEfficiency"
-        ]
+        legend_skills = LEGEND_SKILLS
 
         existing = {b.get("name") for b in buffs}
 
@@ -782,3 +901,174 @@ class SaveEditorApp(tk.Tk):
             msg += f"ID {item_id} → {len(items)} items\n"
 
         messagebox.showwarning("Duplicate IDs Found", msg)
+        
+    def set_unknown008(self):
+        if not self.current_data:
+            return
+
+        tree = self.current_tree
+
+        def apply(item):
+            if "unknown" not in item:
+                item["unknown"] = {}
+
+            item["unknown"]["unknown008"] = 8
+
+        if tree:
+            selected = tree.selection()
+
+            if selected:
+                for row_id in selected:
+                    if (tree, row_id) not in self.global_map:
+                        continue
+
+                    _, _, item = self.global_map[(tree, row_id)]
+                    apply(item)
+
+                self.populate()
+                return
+
+        player = self.current_data.get("player", {})
+        inventory = player.get("inventory", {})
+        storage = player.get("storage", {})
+
+        all_items = (
+            inventory.get("items1", []) +
+            inventory.get("quickSlots", []) +
+            inventory.get("equipmentSlots", []) +
+            inventory.get("items3", []) +
+            storage.get("items1", []) +
+            storage.get("items3", [])
+        )
+
+        for item in all_items:
+            if isinstance(item, dict):
+                apply(item)
+
+        self.populate()
+        
+    def set_op_craft_combo(self):
+        if not self.current_data:
+            return
+
+        def apply(item):
+            if not isinstance(item, dict):
+                return
+
+            item["craftPlan"] = "Craftplan_GTFO20"
+
+            item["upgradeSockets"] = [
+                "Craftplan_GTFO20",
+                "Craftplan_LightingRod",
+                "Throwable_PoisonGrenade",
+                "Craft_Upgrade_DamL2DurL2BalL2"
+            ]
+
+        tree = self.current_tree
+
+        if tree:
+            selected = tree.selection()
+
+            if selected:
+                for row_id in selected:
+                    if (tree, row_id) not in self.global_map:
+                        continue
+
+                    _, _, item = self.global_map[(tree, row_id)]
+                    apply(item)
+
+                self.populate()
+                return
+
+        player = self.current_data.get("player", {})
+        inventory = player.get("inventory", {})
+
+        all_items = (
+            inventory.get("items1", []) +
+            inventory.get("quickSlots", []) +
+            inventory.get("equipmentSlots", [])
+        )
+
+        for item in all_items:
+            apply(item)
+
+        self.populate()
+        
+    def apply_craftplan(self):
+        if not self.current_data:
+            return
+
+        craftplan = self.craftplan_var.get()
+
+        def apply(item):
+            if not isinstance(item, dict):
+                return
+
+            item["craftPlan"] = craftplan
+
+        tree = self.current_tree
+
+        if tree and tree.selection():
+            for row_id in tree.selection():
+                if (tree, row_id) not in self.global_map:
+                    continue
+
+                _, _, item = self.global_map[(tree, row_id)]
+                apply(item)
+
+            self.populate()
+            return
+
+        player = self.current_data.get("player", {})
+        inventory = player.get("inventory", {})
+
+        all_items = (
+            inventory.get("items1", []) +
+            inventory.get("quickSlots", []) +
+            inventory.get("equipmentSlots", [])
+        )
+
+        for item in all_items:
+            apply(item)
+
+        self.populate()
+        
+    def apply_weapon_name(self):
+        if not self.current_data:
+            return
+
+        new_name = self.weapon_name_var.get()
+
+        def apply(item):
+            if not isinstance(item, dict):
+                return
+
+            if "name" in item:
+                item["name"] = new_name
+
+        tree = self.current_tree
+
+        if tree and tree.selection():
+            for row_id in tree.selection():
+                if (tree, row_id) not in self.global_map:
+                    continue
+
+                _, _, item = self.global_map[(tree, row_id)]
+                apply(item)
+
+            self.populate()
+            return
+
+        player = self.current_data.get("player", {})
+        inventory = player.get("inventory", {})
+
+        all_items = (
+            inventory.get("items1", []) +
+            inventory.get("quickSlots", []) +
+            inventory.get("equipmentSlots", [])
+        )
+
+        for item in all_items:
+            apply(item)
+
+        self.populate()

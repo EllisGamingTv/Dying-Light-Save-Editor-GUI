@@ -1,6 +1,7 @@
 import os
 import importlib.util
 import sys
+import traceback
 
 def get_base_path():
     if getattr(sys, 'frozen', False):
@@ -18,24 +19,37 @@ def load_plugins():
         return plugins
 
     for file in os.listdir(plugin_folder):
-        if file.endswith(".py"):
-            file_path = os.path.join(plugin_folder, file)
+        if not file.endswith(".py"):
+            continue
 
-            try:
-                spec = importlib.util.spec_from_file_location(file[:-3], file_path)
-                module = importlib.util.module_from_spec(spec)
+        file_path = os.path.join(plugin_folder, file)
+        module_name = f"plugin_{file[:-3]}"
+
+        try:
+            if module_name in sys.modules:
+                del sys.modules[module_name]
+
+            spec = importlib.util.spec_from_file_location(module_name, file_path)
+            module = importlib.util.module_from_spec(spec)
+
+            sys.modules[module_name] = module
+
+            if spec and spec.loader:
                 spec.loader.exec_module(module)
+            else:
+                continue
 
-                if hasattr(module, "run") or hasattr(module, "init_ui"):
-                    plugins.append({
-                        "name": getattr(module, "name", file[:-3]),
-                        "run": getattr(module, "run", None),
-                        "init_ui": getattr(module, "init_ui", None),
-                        "refresh": getattr(module, "refresh", None),
-                        "module": module
-})
+            if hasattr(module, "run") or hasattr(module, "init_ui"):
+                plugins.append({
+                    "name": getattr(module, "PLUGIN_NAME", file[:-3]),
+                    "run": getattr(module, "run", None),
+                    "init_ui": getattr(module, "init_ui", None),
+                    "refresh": getattr(module, "refresh", None),
+                    "module": module
+                })
 
-            except Exception as e:
-                print(f"[PLUGIN ERROR] {file}: {e}")
+        except Exception:
+            print(f"[PLUGIN ERROR] {file}")
+            traceback.print_exc()
 
     return plugins

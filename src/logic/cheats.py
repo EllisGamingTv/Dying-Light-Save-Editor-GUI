@@ -62,3 +62,33 @@ def get_duplicate_id_map(items):
         id_map.setdefault(item_id, []).append(item)
 
     return {k: v for k, v in id_map.items() if len(v) > 1}
+    
+LEGEND_SKILLS = [
+    "LegendSkill_UnarmedDamage",
+    "LegendSkill_OneHandedDamage",
+    "LegendSkill_TwoHandedDamage",
+    "LegendSkill_FirearmsDamage",
+    "LegendSkill_BowDamage",
+    "LegendSkill_ThrowingDamage",
+    "LegendSkill_MaxStamina",
+    "LegendSkill_MaxHealth",
+    "LegendSkill_HealthRegeneration",
+    "LegendSkill_HealingEfficiency"
+]
+
+ORANGE_CRAFTPLANS = [
+    "Craftplan_GodHammer",
+    "Craftplan_AngelSword",
+    "Craftplan_AllInOne",
+    "Craftplan_LightingRod",
+    "Craftplan_ToxicReaper"
+]
+
+WEAPON_NAMES = [
+    "ZZZZZ_MacheteBKorek2",
+    "MacheteAKorek",
+    "DevCraftExcalibour",
+    "DevCraftAirStrike",
+    "DevRightHandofgloVA",
+    "DevCraftSiCKBomb"
+]
