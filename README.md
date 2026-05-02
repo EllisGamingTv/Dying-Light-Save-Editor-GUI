@@ -24,3 +24,7 @@ editor.exe and your save file save_coop_0.sav must be at C:\Editor
 * Python
 
 * [CLI by Steffen](https://steffenl.com/projects/dying-light-save-editor/releases).
+
+* Note
+
+i am still learning coding, the code source might burn your eyes. thats why all contributors are appreciated.
