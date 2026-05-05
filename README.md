@@ -28,4 +28,6 @@ editor.exe and your save file save_coop_0.sav must be at C:\Editor
 
 ## Note
 
+if you want ant feature or weapons/skills added you can ask me to add it, i would be glad.
+
 i am still learning coding, the code source might burn your eyes. thats why all contributors are appreciated.
