@@ -20,7 +20,14 @@ SOCKET_UPGRADES = [
     "Craft_Upgrade_DurL2Bal",
     "Craft_Upgrade_DurL2Dam",
     "Craft_Upgrade_BalL2Dam",
-    "Craft_Upgrade_BalL2Dur"
+    "Craft_Upgrade_BalL2Dur",
+    "Craftplan_GTFO20",
+    "Craftplan_LightingRod",
+    "Throwable_PoisonGrenade",
+    "Craftplan_GodHammer",
+    "Craftplan_AngelSword",
+    "Craftplan_AllInOne",
+    "Craftplan_ToxicReaper"
 ]
 
 def max_kings(item):
@@ -91,4 +98,19 @@ WEAPON_NAMES = [
     "DevCraftAirStrike",
     "DevRightHandofgloVA",
     "DevCraftSiCKBomb"
+]
+
+COLLECTIBLES = [
+    "ZZZZ_Collectable_CollectableOutfit_01",
+    "ZZZZ_Collectable_CollectableOutfit_02",
+    "ZZZZ_Collectable_CollectableOutfit_03",
+    "ZZZZ_Collectable_CollectableOutfit_04",
+    "ZZZZ_Collectable_CollectableOutfit_05",
+    "ZZZZ_Collectable_CollectableOutfit_06",
+    "ZZZZ_Collectable_CollectableOutfit_07",
+    "ZZZZ_Collectable_CollectableOutfit_08",
+    "ZZZZ_Collectable_CollectableOutfit_09",
+    "ZZZZ_Collectable_CollectableOutfit_10",
+    "ZZZZ_Collectable_CollectableOutfit_11",
+    "ZZZZ_Collectable_CollectableOutfit_12"
 ]

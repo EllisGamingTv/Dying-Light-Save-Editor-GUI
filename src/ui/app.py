@@ -7,10 +7,12 @@ import shutil
 import time
 import webbrowser
 import copy
+import sys
 
 from logic.batch import run_batch
-from logic.cheats import max_kings, max_quantity, max_skill, set_rarity, set_platinum, SOCKET_UPGRADES, get_duplicate_id_map, LEGEND_SKILLS, ORANGE_CRAFTPLANS, WEAPON_NAMES
+from logic.cheats import max_kings, max_quantity, max_skill, set_rarity, set_platinum, SOCKET_UPGRADES, get_duplicate_id_map, LEGEND_SKILLS, ORANGE_CRAFTPLANS, WEAPON_NAMES, COLLECTIBLES
 from logic.plugin_loader import load_plugins
+from logic.updater import check_updates_async
 
 EDITOR_DIR = r"C:\Editor"
 SAMPLE_BAT = os.path.join(EDITOR_DIR, "sample.bat")
@@ -25,7 +27,7 @@ TEMP_SAVE = os.path.join(EDITOR_DIR, "._tmp.sav")
 class SaveEditorApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Dying Light Save Editor GUI 1.4")
+        self.title("Dying Light Save Editor GUI 1.5")
         self.geometry("1020x700")
 
         self.json_path = DEFAULT_JSON
@@ -37,10 +39,12 @@ class SaveEditorApp(tk.Tk):
         self.global_map = {}
         self.plugins = load_plugins()
         self.socket_options = SOCKET_UPGRADES
+        self.console_visible = False
 
         self.create_widgets()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.current_tree = None
+        check_updates_async(self)
         for plugin in self.plugins:
             if plugin["init_ui"]:
                 plugin["init_ui"](self)
@@ -105,6 +109,12 @@ class SaveEditorApp(tk.Tk):
             text="Apply Weapon Name",
             command=self.apply_weapon_name
         ).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(
+            self,
+            text="Toggle Console",
+            command=self.toggle_console
+        ).pack()
 
         self.status = tk.Label(top, text="")
         self.status.pack(side=tk.RIGHT, padx=10)
@@ -125,6 +135,12 @@ class SaveEditorApp(tk.Tk):
         self.notebook.add(self.tab_stash, text="Stash")
         plugin_frame = tk.LabelFrame(self, text="Plugins")
         plugin_frame.pack(fill=tk.X, pady=5)
+        self.console = tk.Text(self, height=15, bg="black", fg="white")
+        self.console.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.console.pack_forget()
+        
+        sys.stdout = ConsoleRedirect(self.console)
+        sys.stderr = ConsoleRedirect(self.console)
 
         for plugin in self.plugins:
             tk.Button(
@@ -227,7 +243,6 @@ class SaveEditorApp(tk.Tk):
             storage.get("items1", []) +
             storage.get("items3", [])
         )
-        skills = player.get("buffs", []) + player.get("skills", [])
         
         weapon_dropdown_frame = tk.Frame(self.tab_weapons)
         weapon_dropdown_frame.pack(fill=tk.X, pady=5)
@@ -313,6 +328,12 @@ class SaveEditorApp(tk.Tk):
             text="Powerful Weapon",
             command=self.set_unknown008
         ).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(
+            btn_frame_inv,
+            text="Add Collectibles",
+            command=self.add_collectibles
+        ).pack(side=tk.LEFT, padx=5)
 
         self.create_table(
             self.tab_inventory,
@@ -327,8 +348,48 @@ class SaveEditorApp(tk.Tk):
             stash_items,
             self.inventory_map
         )
+        
+        skills = []
 
-        self.create_table(self.tab_skills, ["name","stacks"], skills, self.skill_map)
+        for buff in player.get("buffs", []):
+            name = buff.get("name", "")
+
+            if not name.endswith("_skill"):
+                continue
+
+            skills.append({
+                "name": name.replace("_skill", "").replace("_", " "),
+                "stacks": buff.get("stacks", 0)
+            })
+
+        self.skills_tree = ttk.Treeview(self.tab_skills, columns=("name", "stacks"), show="headings")
+
+        self.skills_tree.heading("name", text="Name")
+        self.skills_tree.heading("stacks", text="Stacks")
+
+        self.skills_tree.pack(fill=tk.BOTH, expand=True)
+        
+        columns = ("name", "stacks")
+        self.skills_tree.bind(
+            "<Double-1>",
+            lambda e: self.edit_cell(e, self.skills_tree, columns)
+        )
+
+        self.skill_map.clear()
+
+        for buff in player.get("buffs", []):
+            name = buff.get("name", "")
+
+            if not name.endswith("_skill"):
+                continue
+
+            item_id = self.skills_tree.insert("", "end", values=(
+                name.replace("_skill", "").replace("_", " "),
+                buff.get("stacks", 0)
+            ))
+
+            self.skill_map[item_id] = buff
+            self.global_map[(self.skills_tree, item_id)] = (None, None, buff)
 
         self.create_stats(self.tab_stats, player)
         
@@ -564,7 +625,7 @@ class SaveEditorApp(tk.Tk):
         win.title("About")
         win.geometry("400x200")
 
-        tk.Label(win, text="Dying Light Save Editor GUI 1.4", font=("Arial", 14)).pack(pady=10)
+        tk.Label(win, text="Dying Light Save Editor GUI 1.5", font=("Arial", 14)).pack(pady=10)
         tk.Label(win, text="By EllisGamingTv", font=("Arial", 14)).pack(pady=10)
 
         tk.Label(
@@ -849,7 +910,7 @@ class SaveEditorApp(tk.Tk):
         frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         def add_socket(value=""):
-            if len(socket_vars) >= 10:
+            if len(socket_vars) >= 20:
                 return
 
             var = tk.StringVar(value=value if value else self.socket_options[0])
@@ -875,6 +936,8 @@ class SaveEditorApp(tk.Tk):
 
         tk.Button(win, text="Add Socket", command=add_socket).pack(pady=5)
         tk.Button(win, text="Save", command=save_sockets).pack(pady=5)
+        height = 500 + (len(socket_vars) * 30)
+        win.geometry(f"400x{min(height, 1000)}")
         
     def check_ids(self):
         all_items = []
@@ -1072,3 +1135,79 @@ class SaveEditorApp(tk.Tk):
             apply(item)
 
         self.populate()
+        
+    def add_collectibles(self):
+        if not self.current_data:
+            return
+
+        player = self.current_data.setdefault("player", {})
+        inventory = player.setdefault("inventory", {})
+        items3 = inventory.setdefault("items3", [])
+
+        existing_names = {item.get("name") for item in items3 if isinstance(item, dict)}
+
+        for i, name in enumerate(COLLECTIBLES):
+            if name in existing_names:
+                continue
+
+            items3.append({
+                "id": 8000000 + i,
+                "name": name,
+                "quantity": 1
+            })
+
+        self.populate()
+        
+    def run_plugin(self, plugin):
+        print(f"[APP] Running plugin: {plugin['name']}")
+
+        try:
+            items = []
+
+            tree = self.current_tree
+            if tree:
+                for row_id in tree.selection():
+                    if (tree, row_id) in self.global_map:
+                        _, _, item = self.global_map[(tree, row_id)]
+                        items.append(item)
+
+            if plugin.get("run"):
+                plugin["run"](self, items)
+
+            print("[APP] Plugin finished successfully")
+
+        except Exception as e:
+            import traceback
+            print("[PLUGIN ERROR]")
+            traceback.print_exc()
+
+        self.populate()
+        
+    def toggle_console(self):
+        if self.console_visible:
+            self.console.pack_forget()
+            self.console_visible = False
+        else:
+            self.console.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+            self.console_visible = True
+
+            self.console.insert("end", 
+                "[INFO] Debug console enabled.\n"
+                "This console is used for plugins and debugging.\n"
+                "Errors and logs will appear here.\n\n"
+            )
+            self.console.see("end")
+        
+class ConsoleRedirect:
+    def __init__(self, textbox):
+        self.textbox = textbox
+
+    def write(self, text):
+        self.textbox.after(0, self._write, text)
+
+    def _write(self, text):
+        self.textbox.insert("end", text)
+        self.textbox.see("end")
+
+    def flush(self):
+        pass
