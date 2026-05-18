@@ -19,9 +19,17 @@ The goal of this project is to provide a reliable and easy-to-use editor for cus
 
 editor.exe and your save file save_coop_0.sav must be at C:\Editor
 
-## Requirements
+## EXE Requirements
+
+* [CLI by Steffen](https://steffenl.com/projects/dying-light-save-editor/releases).
+
+## PY Requirements
 
 * Python
+
+```
+pip install requests packaging
+```
 
 * [CLI by Steffen](https://steffenl.com/projects/dying-light-save-editor/releases).
 
