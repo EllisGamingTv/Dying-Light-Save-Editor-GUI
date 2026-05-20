@@ -33,6 +33,17 @@ pip install requests packaging
 
 * [CLI by Steffen](https://steffenl.com/projects/dying-light-save-editor/releases).
 
+## Compilation
+
+```
+pip install pyinstaller
+```
+* cd to main.py directory then
+
+```
+pyinstaller --onefile --noconsole main.py
+```
+
 ## Plugins
 
 The plugin system lets you easily add new features to the app without touching the main project.
