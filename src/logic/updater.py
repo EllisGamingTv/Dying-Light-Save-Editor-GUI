@@ -5,7 +5,7 @@ import webbrowser
 from packaging import version
 from tkinter import messagebox
 
-CURRENT_VERSION = "1.5"
+CURRENT_VERSION = "1.6"
 
 GITHUB_API = (
     "https://api.github.com/repos/"

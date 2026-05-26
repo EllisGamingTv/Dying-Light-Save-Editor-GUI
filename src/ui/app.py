@@ -27,7 +27,7 @@ TEMP_SAVE = os.path.join(EDITOR_DIR, "._tmp.sav")
 class SaveEditorApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Dying Light Save Editor GUI 1.5")
+        self.title("Dying Light Save Editor GUI 1.6")
         self.geometry("1020x700")
 
         self.json_path = DEFAULT_JSON
@@ -273,6 +273,27 @@ class SaveEditorApp(tk.Tk):
             btn_frame,
             text="Add All Legend Skills",
             command=self.add_legend_skills
+        ).pack(side=tk.LEFT, padx=5)
+        
+        self.special_skill_var = tk.StringVar(value="ZombieSprintUpgrade")
+
+        skill_dropdown = ttk.Combobox(
+            btn_frame,
+            textvariable=self.special_skill_var,
+            values=[
+                "ZombieSprintUpgrade",
+                "ZombieRopeLocoUpgrade"
+            ],
+            state="readonly",
+            width=30
+        )
+
+        skill_dropdown.pack(side=tk.LEFT, padx=5)
+
+        tk.Button(
+            btn_frame,
+            text="Add Skill",
+            command=self.add_special_skill
         ).pack(side=tk.LEFT, padx=5)
 
         tk.Button(
@@ -625,7 +646,7 @@ class SaveEditorApp(tk.Tk):
         win.title("About")
         win.geometry("400x200")
 
-        tk.Label(win, text="Dying Light Save Editor GUI 1.5", font=("Arial", 14)).pack(pady=10)
+        tk.Label(win, text="Dying Light Save Editor GUI 1.6", font=("Arial", 14)).pack(pady=10)
         tk.Label(win, text="By EllisGamingTv", font=("Arial", 14)).pack(pady=10)
 
         tk.Label(
@@ -952,7 +973,6 @@ class SaveEditorApp(tk.Tk):
             inventory.get("items3", [])
         )
 
-        from logic.cheats import get_duplicate_id_map
         duplicates = get_duplicate_id_map(all_items)
 
         if not duplicates:
@@ -1197,6 +1217,27 @@ class SaveEditorApp(tk.Tk):
                 "Errors and logs will appear here.\n\n"
             )
             self.console.see("end")
+            
+    def add_special_skill(self):
+        if not self.current_data:
+            return
+
+        player = self.current_data.get("player", {})
+        buffs = player.setdefault("buffs", [])
+
+        skill_name = self.special_skill_var.get()
+
+        full_name = skill_name + "_skill"
+
+        existing = {b.get("name") for b in buffs}
+
+        if full_name not in existing:
+            buffs.append({
+                "name": full_name,
+                "stacks": 1
+            })
+
+        self.populate()
         
 class ConsoleRedirect:
     def __init__(self, textbox):
